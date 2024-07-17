@@ -305,6 +305,7 @@ main_sources(COMMON_SRC
     fc/settings.h
     fc/stats.c
     fc/stats.h
+    fc/watcher.c
 
     flight/failsafe.c
     flight/failsafe.h
@@ -590,6 +591,8 @@ main_sources(COMMON_SRC
     telemetry/ltm.h
     telemetry/mavlink.c
     telemetry/mavlink.h
+    telemetry/mavlink_px.c
+    telemetry/mavlink_px.h
     telemetry/msp_shared.c
     telemetry/msp_shared.h
     telemetry/smartport.c

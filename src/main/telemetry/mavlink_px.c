@@ -81,7 +81,7 @@
 #include "sensors/temperature.h"
 #include "sensors/esc_sensor.h"
 
-#include "telemetry/mavlink.h"
+#include "telemetry/mavlink_px.h"
 #include "telemetry/telemetry.h"
 
 #include "blackbox/blackbox_io.h"
@@ -268,20 +268,20 @@ static int mavlinkStreamTrigger(enum MAV_DATA_STREAM streamNum)
     return 0;
 }
 
-void freeMAVLinkTelemetryPort(void)
+void freeMAVLinkTelemetryPortPX4(void)
 {
     closeSerialPort(mavlinkPort);
     mavlinkPort = NULL;
     mavlinkTelemetryEnabled = false;
 }
 
-void initMAVLinkTelemetry(void)
+void initMAVLinkTelemetryPX4(void)
 {
-    portConfig = findSerialPortConfig(FUNCTION_TELEMETRY_MAVLINK);
+    portConfig = findSerialPortConfigForPX4(FUNCTION_TELEMETRY_MAVLINK);
     mavlinkPortSharing = determinePortSharing(portConfig, FUNCTION_TELEMETRY_MAVLINK);
 }
 
-void configureMAVLinkTelemetryPort(void)
+void configureMAVLinkTelemetryPortPX4(void)
 {
     if (!portConfig) {
         return;
@@ -312,7 +312,7 @@ static void configureMAVLinkStreamRates(void)
     mavRates[MAV_DATA_STREAM_EXTRA3] = telemetryConfig()->mavlink.extra3_rate;
 }
 
-void checkMAVLinkTelemetryState(void)
+void checkMAVLinkTelemetryStatePX4(void)
 {
     bool newTelemetryEnabledValue = telemetryDetermineEnabledState(mavlinkPortSharing);
 
@@ -321,10 +321,10 @@ void checkMAVLinkTelemetryState(void)
     }
 
     if (newTelemetryEnabledValue) {
-        configureMAVLinkTelemetryPort();
+        configureMAVLinkTelemetryPortPX4();
         configureMAVLinkStreamRates();
     } else
-        freeMAVLinkTelemetryPort();
+        freeMAVLinkTelemetryPortPX4();
 }
 
 static void mavlinkSendMessage(void)
@@ -345,7 +345,7 @@ static void mavlinkSendMessage(void)
     }
 }
 
-void mavlinkSendSystemStatus(void)
+static void mavlinkSendSystemStatus(void)
 {
     // Receiver is assumed to be always present
     uint32_t onboard_control_sensors_present    = (MAV_SYS_STATUS_SENSOR_RC_RECEIVER);
@@ -489,7 +489,7 @@ void mavlinkSendSystemStatus(void)
     mavlinkSendMessage();
 }
 
-void mavlinkSendRCChannelsAndRSSI(void)
+static void mavlinkSendRCChannelsAndRSSI(void)
 {
 #define GET_CHANNEL_VALUE(x) ((rxRuntimeConfig.channelCount >= (x + 1)) ? rxGetChannelValue(x) : 0)
     mavlink_msg_rc_channels_raw_pack(mavSystemId, mavComponentId, &mavSendMsg,
@@ -522,7 +522,7 @@ void mavlinkSendRCChannelsAndRSSI(void)
 }
 
 #if defined(USE_GPS)
-void mavlinkSendPosition(timeUs_t currentTimeUs)
+static void mavlinkSendPosition(timeUs_t currentTimeUs)
 {
     uint8_t gpsFixType = 0;
 
@@ -611,7 +611,7 @@ void mavlinkSendPosition(timeUs_t currentTimeUs)
 }
 #endif
 
-void mavlinkSendAttitude(void)
+static void mavlinkSendAttitude(void)
 {
     mavlink_msg_attitude_pack(mavSystemId, mavComponentId, &mavSendMsg,
         // time_boot_ms Timestamp (milliseconds since system boot)
@@ -632,7 +632,7 @@ void mavlinkSendAttitude(void)
     mavlinkSendMessage();
 }
 
-void mavlinkSendHUDAndHeartbeat(void)
+static void mavlinkSendHUDAndHeartbeat(void)
 {
     float mavAltitude = 0;
     float mavGroundSpeed = 0;
@@ -752,7 +752,7 @@ void mavlinkSendHUDAndHeartbeat(void)
     mavlinkSendMessage();
 }
 
-void mavlinkSendBatteryTemperatureStatusText(void)
+static void mavlinkSendBatteryTemperatureStatusText(void)
 {
     uint16_t batteryVoltages[MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN];
     uint16_t batteryVoltagesExt[MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_EXT_LEN];
@@ -847,7 +847,7 @@ void mavlinkSendBatteryTemperatureStatusText(void)
 
 }
 
-void processMAVLinkTelemetry(timeUs_t currentTimeUs)
+static void processMAVLinkTelemetry(timeUs_t currentTimeUs)
 {
     // is executed @ TELEMETRY_MAVLINK_MAXRATE rate
     if (mavlinkStreamTrigger(MAV_DATA_STREAM_EXTENDED_STATUS)) {
@@ -1061,13 +1061,15 @@ static bool handleIncoming_HEARTBEAT(void) {
 
     if (mavRecvMsg.sysid == 1) // if px4 heartbeat
     {
+        setPXStatus(1);
+        mavlinkSendRCChannelsAndRSSI();
         setPX4Time(micros());
         setVehicleState(msg.system_status); // vehicle state comes from px4 and include the current state of the system
         if (msg.base_mode & MAV_MODE_FLAG_SAFETY_ARMED)
             setPixhawkArmingStatus(1.0);
         else
             setPixhawkArmingStatus(0.0);
-    }
+    } 
     else if (mavRecvMsg.sysid == 2) // if jetson hearbeat
         setJetsonTime(micros());
     else
@@ -1116,7 +1118,7 @@ static bool processMAVLinkIncomingTelemetry(void)
     return false;
 }
 
-void handleMAVLinkTelemetry(timeUs_t currentTimeUs)
+void handleMAVLinkTelemetryPX4(timeUs_t currentTimeUs)
 {
     static bool incomingRequestServed;
 
@@ -1126,11 +1128,6 @@ void handleMAVLinkTelemetry(timeUs_t currentTimeUs)
 
     if (!mavlinkPort) {
         return;
-    }
-
-    if (getPXStatus())
-    {
-        mavlinkSendRCChannelsAndRSSI();
     }
 
     // If we did serve data on incoming request - skip next scheduled messages batch to avoid link clogging

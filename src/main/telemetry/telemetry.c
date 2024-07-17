@@ -45,6 +45,7 @@
 #include "telemetry/smartport.h"
 #include "telemetry/ltm.h"
 #include "telemetry/mavlink.h"
+#include "telemetry/mavlink_px.h"
 #include "telemetry/jetiexbus.h"
 #include "telemetry/ibus.h"
 #include "telemetry/crsf.h"
@@ -110,6 +111,7 @@ void telemetryInit(void)
 
 #if defined(USE_TELEMETRY_MAVLINK)
     initMAVLinkTelemetry();
+    initMAVLinkTelemetryPX4();
 #endif
 
 #if defined(USE_TELEMETRY_JETIEXBUS)
@@ -177,6 +179,7 @@ void telemetryCheckState(void)
 
 #if defined(USE_TELEMETRY_MAVLINK)
     checkMAVLinkTelemetryState();
+    checkMAVLinkTelemetryStatePX4();
 #endif
 
 #if defined(USE_TELEMETRY_JETIEXBUS)
@@ -221,6 +224,7 @@ void telemetryProcess(timeUs_t currentTimeUs)
 
 #if defined(USE_TELEMETRY_MAVLINK)
     handleMAVLinkTelemetry(currentTimeUs);
+    handleMAVLinkTelemetryPX4(currentTimeUs);
 #endif
 
 #if defined(USE_TELEMETRY_JETIEXBUS)

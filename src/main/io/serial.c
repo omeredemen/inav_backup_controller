@@ -206,6 +206,18 @@ typedef struct findSerialPortConfigState_s {
 
 static findSerialPortConfigState_t findSerialPortConfigState;
 
+serialPortConfig_t *findSerialPortConfigForPX4(serialPortFunction_e function)
+{
+    memset(&findSerialPortConfigState, 0, sizeof(findSerialPortConfigState));
+
+    serialPortConfig_t *candidate = &serialConfigMutable()->portConfigs[5];
+    if (candidate->functionMask & function) {
+        return candidate;
+    }
+
+    return NULL;
+}
+
 serialPortConfig_t *findSerialPortConfig(serialPortFunction_e function)
 {
     memset(&findSerialPortConfigState, 0, sizeof(findSerialPortConfigState));
